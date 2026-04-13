@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <title>My ChatBot AI</title>
+
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    </head>
+
+    <body class="bg-light">
+        <div class="container py-5">
+            <h2 class="mb-4">Translator</h2>
+            <h3 class="mb-5">DeepSeek-R1:8B</h3>
+
+            <div class="card shadow">
+                <div class="card-body">
+                    <div id="chat-box" class="mb-3 p-3 bg-light border rounded" style="height: 400px; overflow-y: auto;"></div>
+                    <div class="input-group">
+                        <input autofocus type="text" id="user-input" class="form-control" placeholder="Type your prompt here..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                         
+                        <button class="btn btn-primary px-4" onclick="sendMessage()">Send</button>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <script>
+            async function sendMessage() {
+                const input = document.getElementById("user-input");
+                const message = input.value.trim();
+                if(!message){return;}
+
+                const chatBox = document.getElementById("chat-box");
+
+                const userText = document.createElement("div");
+                userText.className = "mb-2";
+                const strong = document.createElement("strong");
+                strong.textContent = " You:";
+                userText.appendChild(strong);
+                userText.appendChild(document.createTextNode(" " + message));
+                chatBox.appendChild(userText);
+
+                input.value = "";
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                console.log("sending prompt:", message);
+
+                function isEnglish(text) {
+                    return /[a-zA-Z]/.test(text);
+                }
+
+                function isKorean(text) {
+                    return /[가-힣]/.test(text);
+                }
+
+                console.log((isEnglish(message))? "English" : "Korean")
+                
+
+                const checkMsg = message.replace(/[^\p{L}\s]/gu, "").split(/\s+/);
+                console.log(checkMsg)
+                
+                let enCount = 0;
+                let krCount = 0;
+
+                for (let x = 0; x < checkMsg.length; x++) {
+                    if(isEnglish(checkMsg[x])){
+                        enCount += 1;
+                    }else if(isKorean(checkMsg[x])){
+                        krCount += 1;
+                    }
+                    
+                }
+                console.log(krCount)
+                let fixPrompt;
+
+                if (enCount >= krCount && enCount != 0){
+                    fixPrompt = `Translate the English sentence into natural, everyday Korean (polite 해요체), avoiding literal translation when unnatural; if the sentence is unclear or cannot be translated, return exactly -1; output only the Korean sentence with no explanation: "${message}"`;
+                }else if(enCount < krCount){
+                    fixPrompt = `Translate the Korean sentence into natural, everyday English, avoiding literal translation when unnatural; if the sentence is unclear or cannot be translated, return exactly -1; output only the English sentence with no explanation: "${message}"`;
+                }else {
+                    chatBox.innerHTML += `<div class="text-danger mb-2"><strong>Error:</strong> Please rephrase or enter a valid sentance.</div>`;
+                    return
+                }
+
+                console.log("sending prompt:", fixPrompt);
+
+                try {
+                    const response = await fetch("/chat", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({fixPrompt}),
+                    });
+                    
+                    const data = await response.json();
+                    console.log("Receiving response:", data);
+
+
+                    if(data.response != -1 && (isEnglish(data.response) || isKorean(data.response))){
+                        chatBox.innerHTML += `
+                            <div class="mb-3"><strong class="text-primary">Bot: </strong><div class="p-3 bg-white border rounded shadow-sm font-monospace" style="white-space: pre-wrap; font-size:0.9rem;">${data.response}</div></div>
+                        `;
+                    }else{
+                        chatBox.innerHTML += `<div class="text-danger mb-2"><strong>Error:</strong> Please rephrase or enter a valid sentance.</div>`;
+                    }
+
+                } catch (error) {
+                    console.error("Error:", error);
+                    chatBox.innerHTML += `<div class="text-danger mb-2"><strong>Error:</strong> Failed to connect to server.</div>`;
+                }
+
+                
+                
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        </script>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+
+    </body>
+</html>
